@@ -23,12 +23,20 @@ Shader "Veyra/Particles"
             #define UNITY_INDIRECT_DRAW_ARGS IndirectDrawArgs
             #include "UnityIndirect.cginc"
 
-            struct Particle { float3 position; float3 velocity; float age; float seed; };
+            struct Particle { float3 position; float3 velocity; float age; float seed; float lifetime; };
             StructuredBuffer<Particle> Particles;
             float _ParticleSize;
+            float _SizeRandomness;
             float4 _StartColor;
             float4 _EndColor;
-            float _Lifetime;
+
+            float hash11(float p)
+            {
+                p = frac(p * 0.1031);
+                p *= p + 33.33;
+                p *= p + p;
+                return frac(p);
+            }
 
             struct Varyings
             {
@@ -41,11 +49,13 @@ Shader "Veyra/Particles"
             {
                 InitIndirectDrawArgs(0);
                 Particle p = Particles[GetIndirectVertexID(svVertexID)];
-                float t = saturate(p.age / max(0.001, _Lifetime));
+                float t = saturate(p.age / max(0.001, p.lifetime));
+                float sizeFactor = lerp(1.0 - _SizeRandomness, 1.0, hash11(p.seed + 91.3));
                 Varyings o;
                 o.positionCS = UnityWorldToClipPos(p.position);
                 o.color = lerp(_StartColor, _EndColor, t);
-                o.size = _ParticleSize * (1.0 + 2.0 * t);
+                o.color.a *= 1.0 - t;
+                o.size = _ParticleSize * sizeFactor * (1.0 + 2.0 * t);
                 return o;
             }
 
