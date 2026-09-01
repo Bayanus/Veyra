@@ -2,83 +2,154 @@
 
 **Programmable runtime for procedural visual effects in Unity.**
 
-Veyra is a code-first VFX system. An effect is described as a program through the Veyra API and compiled into a renderer/runtime representation. The same API is intended to be usable by a human, generated code, or future editor tooling.
+Veyra is a code-first VFX system: an effect is authored as a program, compiled to backend-neutral IR, and executed by a runtime. Humans, generated code and future editor tools use the same API.
 
-## Core model
+AI is **not** a subsystem. It is simply another authoring client.
+
+## The target workflow
+
+The important test for Veyra is not “can it make particles?” but:
+
+> “Make me an awesome juicy lightning effect.”
+
+A generated Veyra definition should be able to describe that effect in ordinary C# and the Unity user should only need to put the resulting `VeyraEffectPlayer` in a scene and assign the definition.
 
 ```text
-Human / AI / Editor
-        ↓
-    Veyra API
-        ↓
-    Effect IR
-        ↓
-    Veyra Compiler
-        ↓
-    Veyra Runtime
-     ↙        ↘
- Simulation   Rendering
-    GPU          GPU
+Human request
+     ↓
+Human / AI writes Veyra definition
+     ↓
+Veyra API
+     ↓
+Veyra IR
+     ↓
+Veyra Runtime
+     ↓
+Unity scene
 ```
 
-AI is **not** a special subsystem of Veyra. It is simply another client capable of producing Veyra programs.
+## Vertical slice — 0.2
 
-## API direction
+The current vertical slice proves the complete authoring-to-rendering path for procedural beams/lightning:
+
+- code-authored `VeyraEffectDefinition`
+- `VeyraProgram` → `VeyraIR` compilation
+- procedural jagged beam generation
+- deterministic branching
+- animated flicker/noise
+- layered core + hot core + halo rendering
+- additive beam shader
+- reusable `VeyraEffectPlayer` component
+- example “Succulent Lightning” effect
+
+Example authoring API:
 
 ```csharp
-var effect = VeyraProgram.Create();
+public override VeyraProgram Build()
+{
+    var fx = VeyraProgram.Create("Lightning");
 
-var particles = effect.Emitter("fire")
-    .Burst(1000)
-    .At(Vector3.zero)
-    .Velocity(Vector3.up * 3f)
-    .Lifetime(1.5f)
-    .LifetimeRandom(0.25f)
-    .Size(0.2f);
+    fx.Beam("Main")
+        .From(Vector3.zero)
+        .To(Vector3.forward * 8f)
+        .Segments(30)
+        .Jagged(1.2f)
+        .Width(0.08f)
+        .Branches(8)
+        .BranchLength(0.4f)
+        .Flicker(0.35f)
+        .Speed(22f)
+        .Color(new Color(0.6f, 0.85f, 1f));
 
-effect.Field(VeyraFieldType.Gravity, 2f);
-effect.Field(VeyraFieldType.Turbulence, 1.5f);
-effect.Render(VeyraRenderType.Billboard);
-
-var program = effect.Compile();
+    return fx;
+}
 ```
 
-The API is deliberately renderer-agnostic. The long-term goal is to describe effects in terms of emitters, particles, fields, transformations, animation and rendering rather than exposing GPU implementation details directly.
+The example deliberately builds a lightning effect from several beams rather than hard-coding a “lightning renderer”. This is the intended direction: reusable primitives first, effect presets second.
 
-## IR direction
-
-The intermediate representation is the contract between the public programmable API and the execution backend:
+## Architecture
 
 ```text
-Veyra API
-   ↓
-Effect IR
-   ├── emitters
-   ├── particle state
-   ├── fields / forces
-   ├── curves / gradients
-   ├── transforms
-   └── render operations
-   ↓
-backend/compiler
-   ├── GPU simulation
-   ├── procedural geometry
-   └── GPU rendering
+                    Veyra API
+                       │
+                       ▼
+                  Veyra Effect
+                       │
+                       ▼
+                    Veyra IR
+                       │
+                ┌──────┴──────┐
+                ▼             ▼
+          GPU particle    Procedural geometry
+           backend             backend
+                │             │
+                └──────┬──────┘
+                       ▼
+                  Veyra Runtime
+                       │
+                       ▼
+                     Unity
 ```
 
-This keeps the public API independent from a particular simulation implementation and leaves room for future CPU/GPU backends, editor tooling and serialization.
+The IR is the contract between authoring and execution. It must not depend on editor state or on a particular rendering implementation.
 
-## Current PoC
+## Current API primitives
 
-The repository currently contains the first GPU execution prototype as well as the beginning of the programmable API. The original particle runtime demonstrates:
+### Simulation
 
-- GPU particle simulation through a Compute Shader
-- `Graphics.DrawProceduralIndirect` rendering
-- Unity Package Manager-compatible package layout
-- configurable particle lifetime, velocity, force, turbulence, size and color
+- emitters
+- burst spawning
+- initial velocity
+- lifetime and randomness
+- size and randomness
+- gradients
+- gravity
+- radial fields
+- vortex fields
+- turbulence
 
-The programmable API/IR is intentionally being designed before expanding the feature set. The goal is to avoid rebuilding Unity's Particle System as a thin wrapper and instead establish a general representation for procedural VFX.
+### Geometry
+
+- procedural beams
+- configurable segment count
+- jagged displacement
+- deterministic seeds
+- branching
+- branch length
+- animated flicker
+
+### Rendering
+
+- billboard
+- trail
+- mesh (API primitive; backend support is still being expanded)
+- additive beam rendering
+
+## Example: use an effect in Unity
+
+1. Create a class deriving from `VeyraEffectDefinition`.
+2. Implement `Build()` with the Veyra API.
+3. Create the definition asset from Unity's asset menu.
+4. Add `VeyraEffectPlayer` to a GameObject.
+5. Assign the definition.
+
+Generated effect code can therefore live directly in a project/package and be reused like any other Unity asset.
+
+## Roadmap after the vertical slice
+
+The vertical slice is intentionally small. The next expansion should make the same API capable of expressing:
+
+1. particle simulation driven by the IR instead of the legacy `VeyraEffect` asset;
+2. curves and gradients as first-class IR values;
+3. transforms, attractors and collision queries;
+4. mesh/ribbon/trail procedural geometry;
+5. spawn/update/render stages and composable operations;
+6. GPU compilation/execution of the same IR;
+7. serialization so generated effects can be stored and versioned independently of C#;
+8. a small library of primitives that makes generated effect authoring fast and predictable.
+
+The end goal is not a clone of Unity Particle System. It is a programmable VFX language/runtime where an effect can be generated, reviewed, versioned and executed without hand-building a large graph in the editor.
 
 ## Status
 
-Experimental PoC — API, IR and execution architecture are expected to change.
+**0.2 vertical slice — experimental.** The lightning path is functional; the broader programmable runtime is still under active development.
