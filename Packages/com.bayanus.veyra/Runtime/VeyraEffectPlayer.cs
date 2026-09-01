@@ -9,12 +9,13 @@ namespace Veyra
         public VeyraEffectDefinition definition;
         public bool playOnEnable = true;
         public bool loop = true;
-        public float scale = 1f;
+        [Min(0.001f)] public float scale = 1f;
 
         VeyraIR ir;
         readonly List<LineRenderer> lines = new();
         Material runtimeMaterial;
         float age;
+        bool playing;
 
         void OnEnable()
         {
@@ -25,49 +26,77 @@ namespace Veyra
         {
             Stop();
             if (!definition) return;
-            ir = definition.Build()?.Compile();
+
+            VeyraProgram program = definition.Build();
+            if (program == null) return;
+            ir = program.Compile();
             if (ir == null) return;
+
             age = 0f;
+            playing = true;
             BuildBeamRenderers();
+            UpdateBeams();
         }
 
         public void Stop()
         {
+            playing = false;
             for (int i = 0; i < lines.Count; i++)
                 if (lines[i]) Destroy(lines[i].gameObject);
             lines.Clear();
             if (runtimeMaterial) Destroy(runtimeMaterial);
             runtimeMaterial = null;
             ir = null;
+            age = 0f;
         }
+
+        public void Restart() => Play();
 
         void Update()
         {
-            if (ir == null) return;
+            if (!playing || ir == null) return;
+
             age += Time.deltaTime;
             UpdateBeams();
-            if (!loop && age > GetDuration()) Stop();
+
+            if (!loop && HasFiniteDuration() && age >= GetDuration())
+                Stop();
+        }
+
+        bool HasFiniteDuration()
+        {
+            for (int i = 0; i < ir.beams.Count; i++)
+            {
+                var beam = ir.beams[i];
+                if (beam.attack > 0f || beam.decay > 0f || beam.off > 0f)
+                    return true;
+            }
+            return false;
         }
 
         float GetDuration()
         {
             float duration = 0f;
-            bool hasEnvelope = false;
             for (int i = 0; i < ir.beams.Count; i++)
             {
                 var beam = ir.beams[i];
-                if (beam.attack > 0f || beam.decay > 0f || beam.off > 0f)
-                    hasEnvelope = true;
                 float cycle = beam.attack + beam.hold + beam.decay + beam.off;
                 if (cycle > duration) duration = cycle;
             }
-            return hasEnvelope ? duration : 60f;
+            return duration;
         }
 
         void BuildBeamRenderers()
         {
+            if (ir.beams.Count == 0) return;
+
             Shader shader = Shader.Find("Veyra/UnlitAdditive");
-            if (!shader) return;
+            if (!shader)
+            {
+                Debug.LogError("Veyra: shader 'Veyra/UnlitAdditive' was not found.", this);
+                return;
+            }
+
             runtimeMaterial = new Material(shader);
             int index = 0;
             foreach (var beam in ir.beams)
@@ -87,15 +116,20 @@ namespace Veyra
             line.material = runtimeMaterial;
             line.alignment = LineAlignment.View;
             line.textureMode = LineTextureMode.Stretch;
+            line.useWorldSpace = false;
             line.positionCount = 2;
             line.widthMultiplier = width * scale;
-            var c = color; c.a *= alpha;
-            line.startColor = c; line.endColor = c;
+            var c = color;
+            c.a *= alpha;
+            line.startColor = c;
+            line.endColor = c;
             lines.Add(line);
         }
 
         void UpdateBeams()
         {
+            if (lines.Count == 0) return;
+
             int lineIndex = 0;
             foreach (var beam in ir.beams)
             {
@@ -103,6 +137,7 @@ namespace Veyra
                 uint cycleSeed = (uint)cycle * 2246822519u;
                 float localTime = GetCycleTime(beam, age);
                 var main = VeyraBeamGenerator.Generate(beam, localTime, cycleSeed);
+
                 ApplyLine(lines[lineIndex++], main, beam.width, beam.color, intensity);
                 ApplyLine(lines[lineIndex++], main, beam.width * 3.5f, beam.color, intensity * (0.18f + beam.flicker * 0.08f));
 
@@ -132,11 +167,10 @@ namespace Veyra
 
             float position = Mathf.Repeat(time, cycle);
             cycleIndex = Mathf.FloorToInt(time / cycle);
-            float attackEnd = beam.attack;
-            float holdEnd = attackEnd + beam.hold;
+            float holdEnd = beam.attack + beam.hold;
             float decayEnd = holdEnd + beam.decay;
 
-            if (beam.attack > 0f && position < attackEnd)
+            if (beam.attack > 0f && position < beam.attack)
                 intensity = position / beam.attack;
             else if (position < holdEnd)
                 intensity = 1f;
@@ -150,11 +184,14 @@ namespace Veyra
         {
             line.positionCount = points.Count;
             for (int i = 0; i < points.Count; i++)
-                line.SetPosition(i, transform.InverseTransformPoint(transform.TransformPoint(points[i] * scale)));
+                line.SetPosition(i, points[i] * scale);
+
             float pulse = intensity <= 0f ? 0f : 1f - Random01((uint)line.GetInstanceID(), age * 14f) * 0.35f;
             line.widthMultiplier = width * scale * pulse;
-            var c = color; c.a *= intensity * pulse;
-            line.startColor = c; line.endColor = c;
+            var c = color;
+            c.a *= intensity * pulse;
+            line.startColor = c;
+            line.endColor = c;
         }
 
         static List<Vector3> GenerateBranch(VeyraIRBeam beam, List<Vector3> main, int branchIndex, float time, uint cycleSeed)
