@@ -6,14 +6,21 @@ namespace Veyra
     [AddComponentMenu("Veyra/Effect Player")]
     public sealed class VeyraEffectPlayer : MonoBehaviour
     {
+        [Header("Program")]
         public VeyraEffectDefinition definition;
         public bool playOnEnable = true;
         public bool loop = true;
         [Min(0.001f)] public float scale = 1f;
 
+        [Header("GPU Particle Backend")]
+        public ComputeShader particleSimulation;
+        public Material particleMaterial;
+        public bool enableParticles = true;
+
         VeyraIR ir;
         readonly List<LineRenderer> lines = new();
         Material runtimeMaterial;
+        VeyraParticleBackend particleBackend;
         float age;
         bool playing;
 
@@ -35,7 +42,9 @@ namespace Veyra
             age = 0f;
             playing = true;
             BuildBeamRenderers();
+            BuildParticleBackend();
             UpdateBeams();
+            particleBackend?.Update(0f, 0f);
         }
 
         public void Stop()
@@ -46,6 +55,8 @@ namespace Veyra
             lines.Clear();
             if (runtimeMaterial) Destroy(runtimeMaterial);
             runtimeMaterial = null;
+            particleBackend?.Dispose();
+            particleBackend = null;
             ir = null;
             age = 0f;
         }
@@ -56,11 +67,32 @@ namespace Veyra
         {
             if (!playing || ir == null) return;
 
-            age += Time.deltaTime;
+            float deltaTime = Time.deltaTime;
+            age += deltaTime;
             UpdateBeams();
+            particleBackend?.Update(deltaTime, Time.time);
 
             if (!loop && HasFiniteDuration() && age >= GetDuration())
                 Stop();
+        }
+
+        void BuildParticleBackend()
+        {
+            if (!enableParticles || ir == null || ir.emitters.Count == 0) return;
+            if (!particleSimulation || !particleMaterial)
+            {
+                Debug.LogWarning("Veyra: effect contains emitters but particleSimulation and particleMaterial are not assigned. Particle execution is disabled.", this);
+                return;
+            }
+
+            particleBackend = new VeyraParticleBackend(this, particleSimulation, particleMaterial);
+            if (!particleBackend.IsValid)
+            {
+                particleBackend.Dispose();
+                particleBackend = null;
+                return;
+            }
+            particleBackend.Build(ir, transform);
         }
 
         bool HasFiniteDuration()
@@ -222,5 +254,6 @@ namespace Veyra
         }
 
         void OnDisable() => Stop();
+        void OnDestroy() => Stop();
     }
 }
