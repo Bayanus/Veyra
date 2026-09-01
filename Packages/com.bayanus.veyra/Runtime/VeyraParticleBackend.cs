@@ -8,6 +8,7 @@ namespace Veyra
     internal sealed class VeyraParticleBackend : IDisposable
     {
         const int MaxFields = 32;
+        const int ParticleStride = sizeof(float) * 9;
         readonly MonoBehaviour owner;
         readonly ComputeShader simulation;
         readonly Material sourceMaterial;
@@ -71,7 +72,7 @@ namespace Veyra
                 int count = Mathf.Clamp(spec.capacity, 1, 1048576);
                 var instance = new EmitterInstance
                 {
-                    particles = new ComputeBuffer(count, sizeof(float) * 8, ComputeBufferType.Structured),
+                    particles = new ComputeBuffer(count, ParticleStride, ComputeBufferType.Structured),
                     args = new GraphicsBuffer(GraphicsBuffer.Target.IndirectArguments, 1, GraphicsBuffer.IndirectDrawArgs.size),
                     kernel = simulation.FindKernel("Update"),
                     count = count,
@@ -103,13 +104,14 @@ namespace Veyra
             simulation.SetInt("BurstCount", Mathf.Clamp(spec.burstCount, 0, instance.count));
             simulation.SetInt("LoopEmitter", loop ? 1 : 0);
             simulation.SetFloat("Lifetime", instance.lifetime);
+            simulation.SetFloat("LifetimeRandomness", Mathf.Clamp01(spec.lifetimeRandomness));
             simulation.SetVector("InitialVelocity", instance.velocity);
             simulation.SetVector("EmitterPosition", instance.position);
             simulation.SetInt("EmitterSeed", emitterIndex * 747796405 + 289133645);
 
             instance.material.SetBuffer("Particles", instance.particles);
             instance.material.SetFloat("_ParticleSize", instance.size);
-            instance.material.SetFloat("_Lifetime", instance.lifetime);
+            instance.material.SetFloat("_SizeRandomness", Mathf.Clamp01(spec.sizeRandomness));
             ApplyGradient(instance.material, spec.color);
         }
 
