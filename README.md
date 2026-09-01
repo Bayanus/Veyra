@@ -2,9 +2,11 @@
 
 **Programmable runtime for procedural visual effects in Unity.**
 
-Veyra is a code-first VFX system. An effect is described as a program through the Veyra API and compiled into a renderer/runtime representation. The same API is intended to be usable by a human, generated code, or future editor tooling.
+Veyra is a code-first VFX runtime. An effect is described as a program through the Veyra API, compiled into an intermediate representation (IR), and executed by a runtime backend.
 
-## Core model
+AI is **not** a special subsystem of Veyra. It is simply another client capable of producing Veyra programs.
+
+## Architecture
 
 ```text
 Human / AI / Editor
@@ -21,14 +23,14 @@ Human / AI / Editor
     GPU          GPU
 ```
 
-AI is **not** a special subsystem of Veyra. It is simply another client capable of producing Veyra programs.
+The public API is intended to remain renderer-agnostic. GPU implementation details belong to execution backends, not effect authors.
 
-## API direction
+## Minimal API
 
 ```csharp
-var effect = VeyraProgram.Create();
+var effect = VeyraProgram.Create("Fire");
 
-var particles = effect.Emitter("fire")
+effect.Emitter("fire")
     .Burst(1000)
     .At(Vector3.zero)
     .Velocity(Vector3.up * 3f)
@@ -43,7 +45,9 @@ effect.Render(VeyraRenderType.Billboard);
 var program = effect.Compile();
 ```
 
-Beam effects can also express temporal behavior without runtime knowledge of a particular effect type:
+## Procedural beams
+
+Beams are part of the same programmable representation:
 
 ```csharp
 var strike = effect.Beam("strike")
@@ -52,6 +56,7 @@ var strike = effect.Beam("strike")
     .Segments(32)
     .Jagged(1.1f)
     .Width(0.08f)
+    .Branches(6)
     .Envelope(
         attack: 0f,
         hold: 0.06f,
@@ -59,47 +64,59 @@ var strike = effect.Beam("strike")
         off: 0.5f);
 ```
 
-`Envelope` is a generic visibility envelope: attack → hold → decay → off, repeated when the effect player is looping. The runtime does not contain lightning-specific behavior.
+`Envelope` is a generic temporal visibility primitive: attack → hold → decay → off. It contains no knowledge of lightning or any other specific effect.
 
-The API is deliberately renderer-agnostic. The long-term goal is to describe effects in terms of emitters, particles, fields, transformations, animation and rendering rather than exposing GPU implementation details directly.
+Repeated envelope cycles receive deterministic per-cycle seed variation, allowing procedural effects to change shape between strikes without introducing global random state.
 
-## IR direction
+## Current release candidate
 
-The intermediate representation is the contract between the public programmable API and the execution backend:
+Version **0.2.0** targets **Unity 6 (`6000.0`)**.
+
+The supported vertical slice demonstrates:
+
+- code-authored effect definitions;
+- API → IR compilation;
+- deterministic procedural beam geometry;
+- branching and temporal variation;
+- generic temporal envelopes;
+- explicit effect lifecycle (`Play`, `Stop`, `Restart`);
+- Unity Package Manager-compatible package structure;
+- a complete horizontal magical lightning example authored through the public API.
+
+### Known limitations
+
+The release candidate is intentionally narrower than the long-term architecture:
+
+- beam execution is currently CPU-driven through Unity `LineRenderer`;
+- emitter, field and render nodes compile into IR but are not yet executed by `VeyraEffectPlayer`;
+- the original GPU particle implementation remains as a legacy prototype and is not yet driven by the programmable IR;
+- automated Unity editor/runtime validation is not included yet.
+
+These are explicit next-stage items rather than hidden implementation gaps.
+
+## Package
 
 ```text
-Veyra API
-   ↓
-Effect IR
-   ├── emitters
-   ├── particle state
-   ├── fields / forces
-   ├── curves / gradients
-   ├── transforms
-   └── render operations
-   ↓
-backend/compiler
-   ├── GPU simulation
-   ├── procedural geometry
-   └── GPU rendering
+Packages/com.bayanus.veyra/
+├── Runtime/
+│   ├── VeyraEffect.cs
+│   ├── VeyraEffectDefinition.cs
+│   ├── VeyraEffectPlayer.cs
+│   ├── VeyraLightning.cs
+│   └── VeyraRuntime.cs        # legacy GPU prototype
+├── Compute/
+│   └── VeyraParticles.compute # legacy GPU prototype
+├── Shaders/
+│   ├── VeyraParticles.shader
+│   └── VeyraUnlitAdditive.shader
+├── Examples/
+│   └── VeyraLightningEffect.cs
+├── package.json
+└── CHANGELOG.md
 ```
-
-This keeps the public API independent from a particular simulation implementation and leaves room for future CPU/GPU backends, editor tooling and serialization.
-
-## Current vertical slice
-
-The repository currently contains two execution paths: the original GPU particle prototype and the newer programmable API/runtime. The programmable beam path is the current vertical slice and demonstrates:
-
-- code-authored effect definitions
-- API → IR compilation
-- deterministic procedural beam geometry
-- branching and flicker
-- generic temporal envelopes
-- Unity Package Manager-compatible package layout
-- an example horizontal magical lightning strike built entirely from the public effect definition API
-
-The original particle runtime remains as a lower-level prototype while the programmable runtime is being expanded toward a unified execution backend.
 
 ## Status
 
-Experimental PoC — API, IR and execution architecture are expected to change. The current goal is to turn the programmable API/IR into a coherent runtime rather than reproduce Unity's Particle System as a wrapper.
+**0.2.0 Release Candidate.**
+
+The API and IR are still experimental, but the current vertical slice is intended to be a coherent, testable foundation for the next runtime milestone rather than a collection of disconnected demos.
