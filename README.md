@@ -13,9 +13,9 @@ Human / AI / Editor
         ↓
     Effect IR
         ↓
-    Veyra Compiler
+   Veyra Compiler
         ↓
-    Veyra Runtime
+   Veyra Runtime
      ↙        ↘
  Simulation   Rendering
     GPU          GPU
@@ -43,6 +43,24 @@ effect.Render(VeyraRenderType.Billboard);
 var program = effect.Compile();
 ```
 
+Beam effects can also express temporal behavior without runtime knowledge of a particular effect type:
+
+```csharp
+var strike = effect.Beam("strike")
+    .From(Vector3.zero)
+    .To(Vector3.right * 8f)
+    .Segments(32)
+    .Jagged(1.1f)
+    .Width(0.08f)
+    .Envelope(
+        attack: 0f,
+        hold: 0.06f,
+        decay: 0.5f,
+        off: 0.5f);
+```
+
+`Envelope` is a generic visibility envelope: attack → hold → decay → off, repeated when the effect player is looping. The runtime does not contain lightning-specific behavior.
+
 The API is deliberately renderer-agnostic. The long-term goal is to describe effects in terms of emitters, particles, fields, transformations, animation and rendering rather than exposing GPU implementation details directly.
 
 ## IR direction
@@ -68,17 +86,20 @@ backend/compiler
 
 This keeps the public API independent from a particular simulation implementation and leaves room for future CPU/GPU backends, editor tooling and serialization.
 
-## Current PoC
+## Current vertical slice
 
-The repository currently contains the first GPU execution prototype as well as the beginning of the programmable API. The original particle runtime demonstrates:
+The repository currently contains two execution paths: the original GPU particle prototype and the newer programmable API/runtime. The programmable beam path is the current vertical slice and demonstrates:
 
-- GPU particle simulation through a Compute Shader
-- `Graphics.DrawProceduralIndirect` rendering
+- code-authored effect definitions
+- API → IR compilation
+- deterministic procedural beam geometry
+- branching and flicker
+- generic temporal envelopes
 - Unity Package Manager-compatible package layout
-- configurable particle lifetime, velocity, force, turbulence, size and color
+- an example horizontal magical lightning strike built entirely from the public effect definition API
 
-The programmable API/IR is intentionally being designed before expanding the feature set. The goal is to avoid rebuilding Unity's Particle System as a thin wrapper and instead establish a general representation for procedural VFX.
+The original particle runtime remains as a lower-level prototype while the programmable runtime is being expanded toward a unified execution backend.
 
 ## Status
 
-Experimental PoC — API, IR and execution architecture are expected to change.
+Experimental PoC — API, IR and execution architecture are expected to change. The current goal is to turn the programmable API/IR into a coherent runtime rather than reproduce Unity's Particle System as a wrapper.
