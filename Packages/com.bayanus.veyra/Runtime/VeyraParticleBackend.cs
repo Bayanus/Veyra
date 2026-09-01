@@ -26,8 +26,6 @@ namespace Veyra
             public float lifetime;
             public Vector3 position;
             public Vector3 velocity;
-            public float radialForce;
-            public float turbulence;
             public float size;
             public Material material;
             public Bounds bounds;
@@ -78,8 +76,6 @@ namespace Veyra
                     lifetime = Mathf.Max(0.001f, spec.lifetime),
                     position = root.TransformPoint(spec.position),
                     velocity = root.TransformDirection(spec.velocity),
-                    radialForce = 0f,
-                    turbulence = 0f,
                     size = Mathf.Max(0.001f, spec.size),
                     material = new Material(renderMaterial),
                     bounds = CalculateBounds(spec, root)
@@ -87,8 +83,6 @@ namespace Veyra
 
                 var args = new uint[5] { 1, (uint)count, 0, 0, 0 };
                 instance.args.SetData(args);
-                instance.particles.SetCounterValue(0);
-
                 Configure(instance, spec, i);
                 emitters.Add(instance);
             }
@@ -103,8 +97,6 @@ namespace Veyra
             simulation.SetFloat("Lifetime", instance.lifetime);
             simulation.SetVector("InitialVelocity", instance.velocity);
             simulation.SetVector("EmitterPosition", instance.position);
-            simulation.SetFloat("RadialForce", instance.radialForce);
-            simulation.SetFloat("Turbulence", instance.turbulence);
             simulation.SetInt("EmitterSeed", emitterIndex * 747796405 + 289133645);
 
             instance.material.SetBuffer("Particles", instance.particles);
@@ -160,7 +152,7 @@ namespace Veyra
                 simulation.SetFloat("TimeValue", time);
                 int groups = Mathf.CeilToInt(instance.count / 256f);
                 simulation.Dispatch(instance.kernel, groups, 1, 1);
-                Graphics.DrawProceduralIndirect(instance.material, instance.bounds, MeshTopology.Points, instance.args, 0, owner.gameObject.layer);
+                Graphics.DrawProceduralIndirect(instance.material, instance.bounds, MeshTopology.Points, instance.args);
             }
         }
 
