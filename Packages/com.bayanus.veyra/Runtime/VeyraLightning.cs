@@ -22,7 +22,7 @@ namespace Veyra
         internal float Attack;
         internal float Hold = 1f;
         internal float Decay;
-        internal float Off = 1f;
+        internal float Off;
 
         internal VeyraBeamNode(string name, uint seed)
         {
@@ -41,7 +41,7 @@ namespace Veyra
         public VeyraBeamNode Speed(float speed) { Speed = Mathf.Max(0f, speed); return this; }
         public VeyraBeamNode Color(Color color) { ColorValue = color; return this; }
 
-        /// <summary>Controls a repeating visibility envelope. Zero values are instantaneous.</summary>
+        /// <summary>Controls a repeating visibility envelope without coupling the runtime to a specific effect type.</summary>
         public VeyraBeamNode Envelope(float attack, float hold, float decay, float off)
         {
             Attack = Mathf.Max(0f, attack);
@@ -70,12 +70,12 @@ namespace Veyra
         public float attack;
         public float hold = 1f;
         public float decay;
-        public float off = 1f;
+        public float off;
     }
 
     internal static class VeyraBeamGenerator
     {
-        public static List<Vector3> Generate(VeyraIRBeam beam, float time)
+        public static List<Vector3> Generate(VeyraIRBeam beam, float time, uint seedOffset = 0)
         {
             var points = new List<Vector3>(beam.segments + 1);
             Vector3 axis = beam.end - beam.start;
@@ -91,6 +91,7 @@ namespace Veyra
             Vector3 side = Vector3.Cross(forward, Mathf.Abs(Vector3.Dot(forward, Vector3.up)) > 0.92f ? Vector3.right : Vector3.up).normalized;
             Vector3 side2 = Vector3.Cross(forward, side).normalized;
             float flickerPhase = time * beam.speed;
+            uint seed = beam.seed + seedOffset;
 
             for (int i = 0; i <= beam.segments; i++)
             {
@@ -99,8 +100,8 @@ namespace Veyra
                 if (i != 0 && i != beam.segments)
                 {
                     float envelope = Mathf.Sin(t * Mathf.PI);
-                    float n1 = Noise(beam.seed, i, flickerPhase, 0f) * 2f - 1f;
-                    float n2 = Noise(beam.seed, i, flickerPhase, 31f) * 2f - 1f;
+                    float n1 = Noise(seed, i, flickerPhase, 0f) * 2f - 1f;
+                    float n2 = Noise(seed, i, flickerPhase, 31f) * 2f - 1f;
                     float amount = beam.jaggedness * length * 0.12f * envelope;
                     p += (side * n1 + side2 * n2) * amount;
                 }
