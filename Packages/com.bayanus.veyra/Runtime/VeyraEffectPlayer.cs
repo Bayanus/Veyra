@@ -103,6 +103,11 @@ namespace Veyra
                 if (beam.attack > 0f || beam.decay > 0f || beam.off > 0f)
                     return true;
             }
+
+            for (int i = 0; i < ir.emitters.Count; i++)
+                if (ir.emitters[i].burstCount > 0)
+                    return true;
+
             return false;
         }
 
@@ -114,6 +119,13 @@ namespace Veyra
                 var beam = ir.beams[i];
                 float cycle = beam.attack + beam.hold + beam.decay + beam.off;
                 if (cycle > duration) duration = cycle;
+            }
+
+            for (int i = 0; i < ir.emitters.Count; i++)
+            {
+                var emitter = ir.emitters[i];
+                if (emitter.burstCount > 0)
+                    duration = Mathf.Max(duration, emitter.lifetime);
             }
             return duration;
         }
