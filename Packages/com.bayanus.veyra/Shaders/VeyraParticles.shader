@@ -23,9 +23,10 @@ Shader "Veyra/Particles"
 
             struct Particle { float3 position; float3 velocity; float age; float seed; };
             StructuredBuffer<Particle> Particles;
-            float ParticleSize;
-            float4 StartColor;
-            float4 EndColor;
+            float _ParticleSize;
+            float4 _StartColor;
+            float4 _EndColor;
+            float _Lifetime;
 
             struct Varyings
             {
@@ -37,11 +38,11 @@ Shader "Veyra/Particles"
             Varyings Vert(uint id : SV_VertexID)
             {
                 Particle p = Particles[id];
-                float t = saturate(p.age / max(0.001, 2.0));
+                float t = saturate(p.age / max(0.001, _Lifetime));
                 Varyings o;
                 o.positionCS = UnityWorldToClipPos(p.position);
-                o.color = lerp(StartColor, EndColor, t);
-                o.size = ParticleSize * (1.0 + 2.0 * t);
+                o.color = lerp(_StartColor, _EndColor, t);
+                o.size = _ParticleSize * (1.0 + 2.0 * t);
                 return o;
             }
 
