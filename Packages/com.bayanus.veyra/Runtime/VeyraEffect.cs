@@ -56,7 +56,7 @@ namespace Veyra
     [Serializable]
     public sealed class VeyraIR
     {
-        public int version = 2;
+        public int version = 3;
         public string name;
         public List<VeyraIREmitter> emitters = new();
         public List<VeyraIRField> fields = new();
@@ -77,7 +77,7 @@ namespace Veyra
             foreach (var s in program.Emitters) ir.emitters.Add(new VeyraIREmitter { name = s.Name, burstCount = s.BurstCount, position = s.Position, velocity = s.Velocity, lifetime = s.Lifetime, lifetimeRandomness = s.LifetimeRandomness, size = s.Size, sizeRandomness = s.SizeRandomness, color = s.Gradient });
             foreach (var s in program.Fields) ir.fields.Add(new VeyraIRField { type = s.Type, strength = s.Strength, position = s.Position, radius = s.Radius });
             foreach (var s in program.Renders) ir.renders.Add(new VeyraIRRender { type = s.Type, material = s.Material });
-            foreach (var s in program.Beams) ir.beams.Add(new VeyraIRBeam { name = s.Name, start = s.Start, end = s.End, segments = s.Segments, jaggedness = s.Jaggedness, width = s.Width, branchCount = s.BranchCount, branchLength = s.BranchLength, flicker = s.Flicker, speed = s.Speed, color = s.ColorValue, seed = s.Seed });
+            foreach (var s in program.Beams) ir.beams.Add(new VeyraIRBeam { name = s.Name, start = s.Start, end = s.End, segments = s.Segments, jaggedness = s.Jaggedness, width = s.Width, branchCount = s.BranchCount, branchLength = s.BranchLength, flicker = s.Flicker, speed = s.Speed, color = s.ColorValue, seed = s.Seed, attack = s.Attack, hold = s.Hold, decay = s.Decay, off = s.Off });
             return ir;
         }
     }
