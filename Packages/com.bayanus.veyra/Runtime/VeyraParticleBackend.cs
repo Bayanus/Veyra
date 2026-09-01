@@ -15,6 +15,7 @@ namespace Veyra
         readonly Vector4[] fieldData = new Vector4[MaxFields * 2];
         ComputeBuffer fieldBuffer;
         int fieldCount;
+        bool loop;
         bool disposed;
 
         struct EmitterInstance : IDisposable
@@ -55,9 +56,10 @@ namespace Veyra
             }
         }
 
-        public void Build(VeyraIR ir, Transform root)
+        public void Build(VeyraIR ir, Transform root, bool loop)
         {
             ClearEmitters();
+            this.loop = loop;
             if (!IsValid || ir == null || ir.emitters.Count == 0) return;
 
             BuildFields(ir, root);
@@ -99,7 +101,7 @@ namespace Veyra
             simulation.SetInt("ParticleCount", instance.count);
             simulation.SetInt("FieldCount", fieldCount);
             simulation.SetInt("BurstCount", Mathf.Clamp(spec.burstCount, 0, instance.count));
-            simulation.SetInt("LoopEmitter", 1);
+            simulation.SetInt("LoopEmitter", loop ? 1 : 0);
             simulation.SetFloat("Lifetime", instance.lifetime);
             simulation.SetVector("InitialVelocity", instance.velocity);
             simulation.SetVector("EmitterPosition", instance.position);
