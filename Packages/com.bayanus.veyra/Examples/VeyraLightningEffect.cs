@@ -5,14 +5,14 @@ namespace Veyra.Examples
     [CreateAssetMenu(menuName = "Veyra/Examples/Succulent Lightning", fileName = "SucculentLightning")]
     public sealed class VeyraLightningEffect : VeyraEffectDefinition
     {
-        public float length = 8f;
-        public float width = 0.08f;
-        public int branches = 7;
-        public float jaggedness = 1.15f;
-        public float flicker = 0.35f;
-        public float flashHold = 0.06f;
-        public float fade = 0.5f;
-        public float pause = 0.5f;
+        [Min(0.1f)] public float length = 8f;
+        [Min(0.001f)] public float width = 0.08f;
+        [Range(0, 64)] public int branches = 7;
+        [Min(0f)] public float jaggedness = 1.15f;
+        [Range(0f, 1f)] public float flicker = 0.35f;
+        [Min(0f)] public float flashHold = 0.06f;
+        [Min(0f)] public float fade = 0.5f;
+        [Min(0f)] public float pause = 0.5f;
 
         public override VeyraProgram Build()
         {
