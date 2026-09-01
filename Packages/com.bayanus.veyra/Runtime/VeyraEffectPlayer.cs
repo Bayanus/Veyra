@@ -52,13 +52,16 @@ namespace Veyra
         float GetDuration()
         {
             float duration = 0f;
+            bool hasEnvelope = false;
             for (int i = 0; i < ir.beams.Count; i++)
             {
                 var beam = ir.beams[i];
+                if (beam.attack > 0f || beam.decay > 0f || beam.off > 0f)
+                    hasEnvelope = true;
                 float cycle = beam.attack + beam.hold + beam.decay + beam.off;
                 if (cycle > duration) duration = cycle;
             }
-            return duration > 0f ? duration : 0f;
+            return hasEnvelope ? duration : 60f;
         }
 
         void BuildBeamRenderers()
@@ -114,7 +117,7 @@ namespace Veyra
         static float GetCycleTime(VeyraIRBeam beam, float time)
         {
             float cycle = beam.attack + beam.hold + beam.decay + beam.off;
-            return cycle > 0f ? Mathf.Repeat(time, cycle) : 0f;
+            return cycle > 0f ? Mathf.Repeat(time, cycle) : time;
         }
 
         static void GetEnvelope(VeyraIRBeam beam, float time, out float intensity, out int cycleIndex)
@@ -150,11 +153,9 @@ namespace Veyra
                 line.SetPosition(i, transform.InverseTransformPoint(transform.TransformPoint(points[i] * scale)));
             float pulse = intensity <= 0f ? 0f : 1f - Random01((uint)line.GetInstanceID(), age * 14f) * 0.35f;
             line.widthMultiplier = width * scale * pulse;
-            var c = color; c.a *= alphaFor(intensity, pulse);
+            var c = color; c.a *= intensity * pulse;
             line.startColor = c; line.endColor = c;
         }
-
-        static float alphaFor(float intensity, float pulse) => intensity * pulse;
 
         static List<Vector3> GenerateBranch(VeyraIRBeam beam, List<Vector3> main, int branchIndex, float time, uint cycleSeed)
         {
