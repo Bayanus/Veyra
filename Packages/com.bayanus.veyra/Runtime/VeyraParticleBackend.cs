@@ -20,7 +20,7 @@ namespace Veyra
         struct EmitterInstance : IDisposable
         {
             public ComputeBuffer particles;
-            public ComputeBuffer args;
+            public GraphicsBuffer args;
             public int kernel;
             public int count;
             public float lifetime;
@@ -33,7 +33,7 @@ namespace Veyra
             public void Dispose()
             {
                 particles?.Release();
-                args?.Release();
+                args?.Dispose();
                 particles = null;
                 args = null;
                 if (material) UnityEngine.Object.Destroy(material);
@@ -41,7 +41,7 @@ namespace Veyra
             }
         }
 
-        public bool IsValid => !disposed && simulation && sourceMaterial;
+        public bool IsValid => !disposed && simulation && sourceMaterial && SystemInfo.supportsComputeShaders;
 
         public VeyraParticleBackend(MonoBehaviour owner, ComputeShader simulation, Material sourceMaterial)
         {
@@ -70,7 +70,7 @@ namespace Veyra
                 var instance = new EmitterInstance
                 {
                     particles = new ComputeBuffer(count, sizeof(float) * 8, ComputeBufferType.Structured),
-                    args = new ComputeBuffer(1, sizeof(uint) * 5, ComputeBufferType.IndirectArguments),
+                    args = new GraphicsBuffer(GraphicsBuffer.Target.IndirectArguments, 1, GraphicsBuffer.IndirectDrawArgs.size),
                     kernel = simulation.FindKernel("Update"),
                     count = count,
                     lifetime = Mathf.Max(0.001f, spec.lifetime),
@@ -81,7 +81,11 @@ namespace Veyra
                     bounds = CalculateBounds(spec, root)
                 };
 
-                var args = new uint[5] { 1, (uint)count, 0, 0, 0 };
+                var args = new GraphicsBuffer.IndirectDrawArgs[1];
+                args[0].vertexCountPerInstance = (uint)count;
+                args[0].instanceCount = 1;
+                args[0].startVertex = 0;
+                args[0].startInstance = 0;
                 instance.args.SetData(args);
                 Configure(instance, spec, i);
                 emitters.Add(instance);
@@ -94,6 +98,8 @@ namespace Veyra
             simulation.SetBuffer(instance.kernel, "Fields", fieldBuffer);
             simulation.SetInt("ParticleCount", instance.count);
             simulation.SetInt("FieldCount", fieldCount);
+            simulation.SetInt("BurstCount", Mathf.Clamp(spec.burstCount, 0, instance.count));
+            simulation.SetInt("LoopEmitter", 1);
             simulation.SetFloat("Lifetime", instance.lifetime);
             simulation.SetVector("InitialVelocity", instance.velocity);
             simulation.SetVector("EmitterPosition", instance.position);
@@ -152,7 +158,13 @@ namespace Veyra
                 simulation.SetFloat("TimeValue", time);
                 int groups = Mathf.CeilToInt(instance.count / 256f);
                 simulation.Dispatch(instance.kernel, groups, 1, 1);
-                Graphics.DrawProceduralIndirect(instance.material, instance.bounds, MeshTopology.Points, instance.args);
+
+                var renderParams = new RenderParams(instance.material)
+                {
+                    worldBounds = instance.bounds,
+                    layer = owner.gameObject.layer
+                };
+                Graphics.RenderPrimitivesIndirect(ref renderParams, MeshTopology.Points, instance.args);
             }
         }
 
