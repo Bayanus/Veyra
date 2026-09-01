@@ -6,6 +6,7 @@ struct Particle
     float3 velocity;
     float age;
     float seed;
+    float lifetime;
 };
 
 struct FieldData
@@ -25,6 +26,7 @@ uint EmitterSeed;
 float DeltaTime;
 float TimeValue;
 float Lifetime;
+float LifetimeRandomness;
 float3 InitialVelocity;
 float3 EmitterPosition;
 
@@ -50,6 +52,7 @@ void Spawn(inout Particle p, uint id)
     p.position = EmitterPosition;
     p.velocity = InitialVelocity + randomDirection(p.seed) * 0.001;
     p.age = 0.0001;
+    p.lifetime = Lifetime * lerp(1.0 - LifetimeRandomness, 1.0, hash11(p.seed + 51.7));
 }
 
 [numthreads(256, 1, 1)]
@@ -71,7 +74,7 @@ void Update(uint id : SV_DispatchThreadID)
     {
         Spawn(p, id);
     }
-    else if (p.age >= Lifetime)
+    else if (p.age >= p.lifetime)
     {
         if (LoopEmitter != 0)
             Spawn(p, id);
