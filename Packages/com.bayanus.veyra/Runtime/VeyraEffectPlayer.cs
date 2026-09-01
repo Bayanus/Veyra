@@ -92,7 +92,7 @@ namespace Veyra
                 particleBackend = null;
                 return;
             }
-            particleBackend.Build(ir, transform);
+            particleBackend.Build(ir, transform, loop);
         }
 
         bool HasFiniteDuration()
