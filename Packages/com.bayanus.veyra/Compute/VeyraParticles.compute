@@ -19,6 +19,8 @@ StructuredBuffer<FieldData> Fields;
 
 uint ParticleCount;
 uint FieldCount;
+uint BurstCount;
+uint LoopEmitter;
 uint EmitterSeed;
 float DeltaTime;
 float TimeValue;
@@ -42,19 +44,43 @@ float3 randomDirection(float seed)
     return float3(cos(a) * r, z, sin(a) * r);
 }
 
+void Spawn(inout Particle p, uint id)
+{
+    p.seed = hash11((float)id * 17.13 + (float)EmitterSeed + floor(TimeValue * 8.0));
+    p.position = EmitterPosition;
+    p.velocity = InitialVelocity + randomDirection(p.seed) * 0.001;
+    p.age = 0.0001;
+}
+
 [numthreads(256, 1, 1)]
 void Update(uint id : SV_DispatchThreadID)
 {
     if (id >= ParticleCount) return;
 
+    uint activeCount = BurstCount > 0 ? min(BurstCount, ParticleCount) : ParticleCount;
     Particle p = Particles[id];
 
-    if (p.age <= 0.0 || p.age >= Lifetime)
+    if (id >= activeCount)
     {
-        p.seed = hash11((float)id * 17.13 + (float)EmitterSeed + floor(TimeValue * 8.0));
-        p.position = EmitterPosition;
-        p.velocity = InitialVelocity + randomDirection(p.seed) * 0.001;
-        p.age = 0.0001;
+        p.age = -1.0;
+        Particles[id] = p;
+        return;
+    }
+
+    if (p.age <= 0.0)
+    {
+        Spawn(p, id);
+    }
+    else if (p.age >= Lifetime)
+    {
+        if (LoopEmitter != 0)
+            Spawn(p, id);
+        else
+        {
+            p.age = -1.0;
+            Particles[id] = p;
+            return;
+        }
     }
     else
     {
