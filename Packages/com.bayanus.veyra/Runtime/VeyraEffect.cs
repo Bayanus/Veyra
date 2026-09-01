@@ -22,10 +22,11 @@ namespace Veyra
 
     public sealed class VeyraEmitterNode
     {
-        internal string Name; internal int BurstCount; internal Vector3 Position; internal Vector3 Velocity;
+        internal string Name; internal int BurstCount; internal int Capacity = 1024; internal Vector3 Position; internal Vector3 Velocity;
         internal float Lifetime = 1f; internal float LifetimeRandomness; internal float Size = 1f; internal float SizeRandomness; internal Gradient Gradient;
         internal VeyraEmitterNode(string name) { Name = string.IsNullOrWhiteSpace(name) ? "Emitter" : name; Gradient = DefaultGradient(); }
         public VeyraEmitterNode Burst(int count) { BurstCount = Mathf.Max(0, count); return this; }
+        public VeyraEmitterNode CapacityCount(int count) { Capacity = Mathf.Clamp(count, 1, 1048576); return this; }
         public VeyraEmitterNode At(Vector3 position) { Position = position; return this; }
         public VeyraEmitterNode Velocity(Vector3 velocity) { Velocity = velocity; return this; }
         public VeyraEmitterNode Lifetime(float seconds) { Lifetime = Mathf.Max(0.001f, seconds); return this; }
@@ -56,7 +57,7 @@ namespace Veyra
     [Serializable]
     public sealed class VeyraIR
     {
-        public int version = 3;
+        public int version = 4;
         public string name;
         public List<VeyraIREmitter> emitters = new();
         public List<VeyraIRField> fields = new();
@@ -64,7 +65,7 @@ namespace Veyra
         public List<VeyraIRBeam> beams = new();
     }
 
-    [Serializable] public sealed class VeyraIREmitter { public string name; public int burstCount; public Vector3 position; public Vector3 velocity; public float lifetime; public float lifetimeRandomness; public float size; public float sizeRandomness; public Gradient color; }
+    [Serializable] public sealed class VeyraIREmitter { public string name; public int burstCount; public int capacity; public Vector3 position; public Vector3 velocity; public float lifetime; public float lifetimeRandomness; public float size; public float sizeRandomness; public Gradient color; }
     [Serializable] public sealed class VeyraIRField { public VeyraFieldType type; public float strength; public Vector3 position; public float radius; }
     [Serializable] public sealed class VeyraIRRender { public VeyraRenderType type; public Material material; }
 
@@ -74,7 +75,7 @@ namespace Veyra
         {
             if (program == null) throw new ArgumentNullException(nameof(program));
             var ir = new VeyraIR { name = program.Name };
-            foreach (var s in program.Emitters) ir.emitters.Add(new VeyraIREmitter { name = s.Name, burstCount = s.BurstCount, position = s.Position, velocity = s.Velocity, lifetime = s.Lifetime, lifetimeRandomness = s.LifetimeRandomness, size = s.Size, sizeRandomness = s.SizeRandomness, color = s.Gradient });
+            foreach (var s in program.Emitters) ir.emitters.Add(new VeyraIREmitter { name = s.Name, burstCount = s.BurstCount, capacity = s.Capacity, position = s.Position, velocity = s.Velocity, lifetime = s.Lifetime, lifetimeRandomness = s.LifetimeRandomness, size = s.Size, sizeRandomness = s.SizeRandomness, color = s.Gradient });
             foreach (var s in program.Fields) ir.fields.Add(new VeyraIRField { type = s.Type, strength = s.Strength, position = s.Position, radius = s.Radius });
             foreach (var s in program.Renders) ir.renders.Add(new VeyraIRRender { type = s.Type, material = s.Material });
             foreach (var s in program.Beams) ir.beams.Add(new VeyraIRBeam { name = s.Name, start = s.Start, end = s.End, segments = s.Segments, jaggedness = s.Jaggedness, width = s.Width, branchCount = s.BranchCount, branchLength = s.BranchLength, flicker = s.Flicker, speed = s.Speed, color = s.ColorValue, seed = s.Seed, attack = s.Attack, hold = s.Hold, decay = s.Decay, off = s.Off });
