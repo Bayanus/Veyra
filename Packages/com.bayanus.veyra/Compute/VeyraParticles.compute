@@ -1,0 +1,65 @@
+#pragma kernel Update
+
+struct Particle
+{
+    float3 position;
+    float3 velocity;
+    float age;
+    float seed;
+};
+
+RWStructuredBuffer<Particle> Particles;
+
+uint ParticleCount;
+float DeltaTime;
+float TimeValue;
+float Lifetime;
+float3 InitialVelocity;
+float3 EmitterPosition;
+float RadialForce;
+float Turbulence;
+
+float hash11(float p)
+{
+    p = frac(p * 0.1031);
+    p *= p + 33.33;
+    p *= p + p;
+    return frac(p);
+}
+
+float3 randomDirection(float seed)
+{
+    float a = hash11(seed + 1.7) * 6.2831853;
+    float z = hash11(seed + 9.2) * 2.0 - 1.0;
+    float r = sqrt(max(0.0, 1.0 - z * z));
+    return float3(cos(a) * r, z, sin(a) * r);
+}
+
+[numthreads(256, 1, 1)]
+void Update(uint id : SV_DispatchThreadID)
+{
+    if (id >= ParticleCount) return;
+
+    Particle p = Particles[id];
+
+    if (p.age <= 0.0 || p.age >= Lifetime)
+    {
+        p.seed = hash11((float)id * 17.13 + floor(TimeValue * 8.0));
+        p.position = EmitterPosition;
+        p.velocity = InitialVelocity + randomDirection(p.seed) * RadialForce;
+        p.age = 0.0001;
+    }
+    else
+    {
+        float3 noise = float3(
+            sin(TimeValue * 2.1 + p.position.y * 1.7 + p.seed * 11.0),
+            cos(TimeValue * 1.7 + p.position.x * 1.3 + p.seed * 7.0),
+            sin(TimeValue * 2.7 + p.position.z * 1.9 + p.seed * 5.0));
+
+        p.velocity += noise * Turbulence * DeltaTime;
+        p.position += p.velocity * DeltaTime;
+        p.age += DeltaTime;
+    }
+
+    Particles[id] = p;
+}
