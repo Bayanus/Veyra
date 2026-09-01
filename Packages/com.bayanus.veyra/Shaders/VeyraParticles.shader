@@ -20,6 +20,8 @@ Shader "Veyra/Particles"
             #pragma vertex Vert
             #pragma fragment Frag
             #include "UnityCG.cginc"
+            #define UNITY_INDIRECT_DRAW_ARGS IndirectDrawArgs
+            #include "UnityIndirect.cginc"
 
             struct Particle { float3 position; float3 velocity; float age; float seed; };
             StructuredBuffer<Particle> Particles;
@@ -35,9 +37,10 @@ Shader "Veyra/Particles"
                 float size : PSIZE;
             };
 
-            Varyings Vert(uint id : SV_VertexID)
+            Varyings Vert(uint svVertexID : SV_VertexID, uint svInstanceID : SV_InstanceID)
             {
-                Particle p = Particles[id];
+                InitIndirectDrawArgs(0);
+                Particle p = Particles[GetIndirectVertexID(svVertexID)];
                 float t = saturate(p.age / max(0.001, _Lifetime));
                 Varyings o;
                 o.positionCS = UnityWorldToClipPos(p.position);
