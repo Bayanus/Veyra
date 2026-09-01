@@ -1,9 +1,9 @@
 {
   "name": "com.bayanus.veyra",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "displayName": "Veyra",
-  "description": "Code-first GPU-driven VFX runtime PoC for Unity.",
-  "unity": "2022.3",
+  "description": "Programmable runtime for procedural visual effects in Unity.",
+  "unity": "6000.0",
   "author": {
     "name": "Bayanus"
   }
