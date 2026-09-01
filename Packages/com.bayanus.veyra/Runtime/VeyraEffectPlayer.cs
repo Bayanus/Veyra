@@ -46,12 +46,26 @@ namespace Veyra
             if (ir == null) return;
             age += Time.deltaTime;
             UpdateBeams();
-            if (!loop && age > 60f) Stop();
+            if (!loop && age > GetDuration()) Stop();
+        }
+
+        float GetDuration()
+        {
+            float duration = 0f;
+            for (int i = 0; i < ir.beams.Count; i++)
+            {
+                var beam = ir.beams[i];
+                float cycle = beam.attack + beam.hold + beam.decay + beam.off;
+                if (cycle > duration) duration = cycle;
+            }
+            return duration > 0f ? duration : 0f;
         }
 
         void BuildBeamRenderers()
         {
-            runtimeMaterial = new Material(Shader.Find("Veyra/UnlitAdditive"));
+            Shader shader = Shader.Find("Veyra/UnlitAdditive");
+            if (!shader) return;
+            runtimeMaterial = new Material(shader);
             int index = 0;
             foreach (var beam in ir.beams)
             {
@@ -82,38 +96,75 @@ namespace Veyra
             int lineIndex = 0;
             foreach (var beam in ir.beams)
             {
-                var main = VeyraBeamGenerator.Generate(beam, age);
-                ApplyLine(lines[lineIndex++], main, beam.width, beam.color, 1f);
-                ApplyLine(lines[lineIndex++], main, beam.width * 3.5f, beam.color, 0.18f + beam.flicker * 0.08f);
+                GetEnvelope(beam, age, out float intensity, out int cycle);
+                uint cycleSeed = (uint)cycle * 2246822519u;
+                float localTime = GetCycleTime(beam, age);
+                var main = VeyraBeamGenerator.Generate(beam, localTime, cycleSeed);
+                ApplyLine(lines[lineIndex++], main, beam.width, beam.color, intensity);
+                ApplyLine(lines[lineIndex++], main, beam.width * 3.5f, beam.color, intensity * (0.18f + beam.flicker * 0.08f));
 
                 for (int b = 0; b < beam.branchCount; b++)
                 {
-                    var branch = GenerateBranch(beam, main, b, age);
-                    ApplyLine(lines[lineIndex++], branch, beam.width * 0.55f, beam.color, 0.55f + beam.flicker * 0.15f);
+                    var branch = GenerateBranch(beam, main, b, localTime, cycleSeed);
+                    ApplyLine(lines[lineIndex++], branch, beam.width * 0.55f, beam.color, intensity * (0.55f + beam.flicker * 0.15f));
                 }
             }
         }
 
-        void ApplyLine(LineRenderer line, List<Vector3> points, float width, Color color, float alpha)
+        static float GetCycleTime(VeyraIRBeam beam, float time)
+        {
+            float cycle = beam.attack + beam.hold + beam.decay + beam.off;
+            return cycle > 0f ? Mathf.Repeat(time, cycle) : 0f;
+        }
+
+        static void GetEnvelope(VeyraIRBeam beam, float time, out float intensity, out int cycleIndex)
+        {
+            float cycle = beam.attack + beam.hold + beam.decay + beam.off;
+            if (cycle <= 0f)
+            {
+                intensity = 1f;
+                cycleIndex = 0;
+                return;
+            }
+
+            float position = Mathf.Repeat(time, cycle);
+            cycleIndex = Mathf.FloorToInt(time / cycle);
+            float attackEnd = beam.attack;
+            float holdEnd = attackEnd + beam.hold;
+            float decayEnd = holdEnd + beam.decay;
+
+            if (beam.attack > 0f && position < attackEnd)
+                intensity = position / beam.attack;
+            else if (position < holdEnd)
+                intensity = 1f;
+            else if (beam.decay > 0f && position < decayEnd)
+                intensity = 1f - (position - holdEnd) / beam.decay;
+            else
+                intensity = 0f;
+        }
+
+        void ApplyLine(LineRenderer line, List<Vector3> points, float width, Color color, float intensity)
         {
             line.positionCount = points.Count;
             for (int i = 0; i < points.Count; i++)
                 line.SetPosition(i, transform.InverseTransformPoint(transform.TransformPoint(points[i] * scale)));
-            float pulse = 1f - Random01((uint)line.GetInstanceID(), age * 14f) * 0.35f;
+            float pulse = intensity <= 0f ? 0f : 1f - Random01((uint)line.GetInstanceID(), age * 14f) * 0.35f;
             line.widthMultiplier = width * scale * pulse;
-            var c = color; c.a *= alpha * pulse;
+            var c = color; c.a *= alphaFor(intensity, pulse);
             line.startColor = c; line.endColor = c;
         }
 
-        static List<Vector3> GenerateBranch(VeyraIRBeam beam, List<Vector3> main, int branchIndex, float time)
+        static float alphaFor(float intensity, float pulse) => intensity * pulse;
+
+        static List<Vector3> GenerateBranch(VeyraIRBeam beam, List<Vector3> main, int branchIndex, float time, uint cycleSeed)
         {
-            int sample = 1 + Mathf.Abs((int)(beam.seed + (uint)branchIndex * 7919u)) % Mathf.Max(1, main.Count - 2);
+            int sample = 1 + Mathf.Abs((int)(beam.seed + cycleSeed + (uint)branchIndex * 7919u)) % Mathf.Max(1, main.Count - 2);
             Vector3 origin = main[sample];
             Vector3 tangent = (main[Mathf.Min(sample + 1, main.Count - 1)] - main[Mathf.Max(0, sample - 1)]).normalized;
             Vector3 side = Vector3.Cross(tangent, Mathf.Abs(Vector3.Dot(tangent, Vector3.up)) > 0.9f ? Vector3.right : Vector3.up).normalized;
-            float angle = Random01(beam.seed + (uint)branchIndex * 31u, time * beam.speed + branchIndex) * Mathf.PI * 2f;
+            float angle = Random01(beam.seed + cycleSeed + (uint)branchIndex * 31u, time * beam.speed + branchIndex) * Mathf.PI * 2f;
             Vector3 direction = (side * Mathf.Cos(angle) + Vector3.Cross(tangent, side) * Mathf.Sin(angle) + tangent * 0.2f).normalized;
-            float remaining = Vector3.Distance(beam.start, beam.end) * beam.branchLength * (0.45f + Random01(beam.seed + 99u + (uint)branchIndex, 3.1f) * 0.55f);
+            float remaining = Vector3.Distance(beam.start, beam.end) * beam.branchLength * (0.45f + Random01(beam.seed + cycleSeed + 99u + (uint)branchIndex, 3.1f) * 0.55f);
             Vector3 end = origin + direction * remaining;
             var branch = new List<Vector3>(7);
             for (int i = 0; i <= 6; i++)
@@ -121,7 +172,7 @@ namespace Veyra
                 float t = i / 6f;
                 Vector3 p = Vector3.Lerp(origin, end, t);
                 if (i > 0 && i < 6)
-                    p += side * (Random01(beam.seed + (uint)(i * 101 + branchIndex), time * beam.speed) * 2f - 1f) * remaining * 0.12f;
+                    p += side * (Random01(beam.seed + cycleSeed + (uint)(i * 101 + branchIndex), time * beam.speed) * 2f - 1f) * remaining * 0.12f;
                 branch.Add(p);
             }
             return branch;
