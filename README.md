@@ -2,7 +2,7 @@
 
 **Programmable runtime for procedural visual effects in Unity.**
 
-Veyra is a code-first VFX runtime. An effect is described as a program through the Veyra API, compiled into an intermediate representation (IR), and executed by a runtime backend.
+Veyra is a code-first VFX runtime. An effect is described as a program through the Veyra API, compiled into an intermediate representation (IR), and executed by runtime backends.
 
 AI is **not** a special subsystem of Veyra. It is simply another client capable of producing Veyra programs.
 
@@ -31,6 +31,7 @@ The public API is intended to remain renderer-agnostic. GPU implementation detai
 var effect = VeyraProgram.Create("Fire");
 
 effect.Emitter("fire")
+    .CapacityCount(4096)
     .Burst(1000)
     .At(Vector3.zero)
     .Velocity(Vector3.up * 3f)
@@ -44,6 +45,8 @@ effect.Render(VeyraRenderType.Billboard);
 
 var program = effect.Compile();
 ```
+
+`Burst(0)` means use the full emitter capacity as an active stream. A positive burst count limits the active particle set to that many particles.
 
 ## Procedural beams
 
@@ -72,10 +75,12 @@ Repeated envelope cycles receive deterministic per-cycle seed variation, allowin
 
 Version **0.2.0** targets **Unity 6 (`6000.0`)**.
 
-The supported vertical slice demonstrates:
+The supported runtime path now demonstrates:
 
 - code-authored effect definitions;
-- API → IR compilation;
+- API → IR compilation for emitters, fields, render nodes and beams;
+- GPU particle simulation driven by programmable emitter/field IR;
+- Unity 6 indirect primitive rendering for billboard particles;
 - deterministic procedural beam geometry;
 - branching and temporal variation;
 - generic temporal envelopes;
@@ -88,11 +93,11 @@ The supported vertical slice demonstrates:
 The release candidate is intentionally narrower than the long-term architecture:
 
 - beam execution is currently CPU-driven through Unity `LineRenderer`;
-- emitter, field and render nodes compile into IR but are not yet executed by `VeyraEffectPlayer`;
-- the original GPU particle implementation remains as a legacy prototype and is not yet driven by the programmable IR;
+- only `Billboard` render nodes execute in the GPU particle backend; `Trail` and `Mesh` remain IR-only;
+- particle gradients currently reduce to start/end colors in the GPU backend;
 - automated Unity editor/runtime validation is not included yet.
 
-These are explicit next-stage items rather than hidden implementation gaps.
+The old direct `VeyraRuntime` GPU prototype is quarantined and marked legacy; it is no longer an alternate execution path.
 
 ## Package
 
@@ -102,15 +107,18 @@ Packages/com.bayanus.veyra/
 │   ├── VeyraEffect.cs
 │   ├── VeyraEffectDefinition.cs
 │   ├── VeyraEffectPlayer.cs
+│   ├── VeyraParticleBackend.cs
 │   ├── VeyraLightning.cs
-│   └── VeyraRuntime.cs        # legacy GPU prototype
+│   └── VeyraRuntime.cs        # legacy compatibility stub
 ├── Compute/
-│   └── VeyraParticles.compute # legacy GPU prototype
+│   └── VeyraParticles.compute
 ├── Shaders/
 │   ├── VeyraParticles.shader
 │   └── VeyraUnlitAdditive.shader
 ├── Examples/
 │   └── VeyraLightningEffect.cs
+├── Tests/
+│   └── Runtime/
 ├── package.json
 └── CHANGELOG.md
 ```
@@ -119,4 +127,4 @@ Packages/com.bayanus.veyra/
 
 **0.2.0 Release Candidate.**
 
-The API and IR are still experimental, but the current vertical slice is intended to be a coherent, testable foundation for the next runtime milestone rather than a collection of disconnected demos.
+The programmable API, IR, CPU beam backend and GPU particle backend form one execution architecture. The remaining release work is validation and hardening in the target Unity 6 editor and on the graphics APIs Veyra intends to support, followed by broader render backend coverage.
