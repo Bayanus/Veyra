@@ -19,6 +19,10 @@ namespace Veyra
         internal float Speed = 18f;
         internal Color ColorValue = Color.white;
         internal uint Seed;
+        internal float Attack;
+        internal float Hold = 1f;
+        internal float Decay;
+        internal float Off = 1f;
 
         internal VeyraBeamNode(string name, uint seed)
         {
@@ -36,6 +40,16 @@ namespace Veyra
         public VeyraBeamNode Flicker(float amount) { Flicker = Mathf.Clamp01(amount); return this; }
         public VeyraBeamNode Speed(float speed) { Speed = Mathf.Max(0f, speed); return this; }
         public VeyraBeamNode Color(Color color) { ColorValue = color; return this; }
+
+        /// <summary>Controls a repeating visibility envelope. Zero values are instantaneous.</summary>
+        public VeyraBeamNode Envelope(float attack, float hold, float decay, float off)
+        {
+            Attack = Mathf.Max(0f, attack);
+            Hold = Mathf.Max(0f, hold);
+            Decay = Mathf.Max(0f, decay);
+            Off = Mathf.Max(0f, off);
+            return this;
+        }
     }
 
     [Serializable]
@@ -53,6 +67,10 @@ namespace Veyra
         public float speed;
         public Color color;
         public uint seed;
+        public float attack;
+        public float hold = 1f;
+        public float decay;
+        public float off = 1f;
     }
 
     internal static class VeyraBeamGenerator
