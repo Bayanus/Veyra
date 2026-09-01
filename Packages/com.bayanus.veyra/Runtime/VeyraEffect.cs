@@ -83,7 +83,9 @@ namespace Veyra
         }
     }
 
-    [CreateAssetMenu(menuName = "Veyra/Effect", fileName = "VeyraEffect")]
+    /// <summary>Legacy prototype asset retained for source compatibility. Use VeyraEffectDefinition instead.</summary>
+    [Obsolete("VeyraEffect is a legacy prototype asset. Use VeyraEffectDefinition and VeyraProgram.", false)]
+    [CreateAssetMenu(menuName = "Veyra/Legacy Effect", fileName = "VeyraEffect")]
     public sealed class VeyraEffect : ScriptableObject
     {
         [Min(1)] public int particleCount = 4096; [Min(0.01f)] public float lifetime = 2f; public Vector3 initialVelocity = new(0, 3, 0);
