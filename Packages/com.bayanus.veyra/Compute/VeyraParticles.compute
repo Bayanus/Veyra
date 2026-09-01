@@ -8,16 +8,23 @@ struct Particle
     float seed;
 };
 
+struct FieldData
+{
+    float4 positionRadius;
+    float4 typeStrength;
+};
+
 RWStructuredBuffer<Particle> Particles;
+StructuredBuffer<FieldData> Fields;
 
 uint ParticleCount;
+uint FieldCount;
+uint EmitterSeed;
 float DeltaTime;
 float TimeValue;
 float Lifetime;
 float3 InitialVelocity;
 float3 EmitterPosition;
-float RadialForce;
-float Turbulence;
 
 float hash11(float p)
 {
@@ -44,19 +51,41 @@ void Update(uint id : SV_DispatchThreadID)
 
     if (p.age <= 0.0 || p.age >= Lifetime)
     {
-        p.seed = hash11((float)id * 17.13 + floor(TimeValue * 8.0));
+        p.seed = hash11((float)id * 17.13 + (float)EmitterSeed + floor(TimeValue * 8.0));
         p.position = EmitterPosition;
-        p.velocity = InitialVelocity + randomDirection(p.seed) * RadialForce;
+        p.velocity = InitialVelocity + randomDirection(p.seed) * 0.001;
         p.age = 0.0001;
     }
     else
     {
-        float3 noise = float3(
-            sin(TimeValue * 2.1 + p.position.y * 1.7 + p.seed * 11.0),
-            cos(TimeValue * 1.7 + p.position.x * 1.3 + p.seed * 7.0),
-            sin(TimeValue * 2.7 + p.position.z * 1.9 + p.seed * 5.0));
+        float3 acceleration = 0.0;
 
-        p.velocity += noise * Turbulence * DeltaTime;
+        for (uint i = 0; i < FieldCount; i++)
+        {
+            FieldData field = Fields[i];
+            float3 offset = p.position - field.positionRadius.xyz;
+            float distance = length(offset);
+            float radius = max(field.positionRadius.w, 0.001);
+            if (distance > radius && field.typeStrength.x != 0.0) continue;
+
+            float falloff = 1.0 - saturate(distance / radius);
+            float strength = field.typeStrength.y * falloff;
+            uint type = (uint)field.typeStrength.x;
+
+            if (type == 0) // Gravity
+                acceleration += float3(0, -strength, 0);
+            else if (type == 1) // Radial
+                acceleration += (distance > 0.0001 ? normalize(offset) : 0.0) * strength;
+            else if (type == 2) // Vortex around Y
+                acceleration += (distance > 0.0001 ? normalize(float3(-offset.z, 0, offset.x)) : 0.0) * strength;
+            else if (type == 3) // Turbulence
+                acceleration += float3(
+                    sin(TimeValue * 2.1 + p.position.y * 1.7 + p.seed * 11.0),
+                    cos(TimeValue * 1.7 + p.position.x * 1.3 + p.seed * 7.0),
+                    sin(TimeValue * 2.7 + p.position.z * 1.9 + p.seed * 5.0)) * strength;
+        }
+
+        p.velocity += acceleration * DeltaTime;
         p.position += p.velocity * DeltaTime;
         p.age += DeltaTime;
     }
