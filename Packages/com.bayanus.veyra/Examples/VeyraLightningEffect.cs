@@ -10,6 +10,9 @@ namespace Veyra.Examples
         public int branches = 7;
         public float jaggedness = 1.15f;
         public float flicker = 0.35f;
+        public float flashHold = 0.06f;
+        public float fade = 0.5f;
+        public float pause = 0.5f;
 
         public override VeyraProgram Build()
         {
@@ -26,6 +29,7 @@ namespace Veyra.Examples
                 .BranchLength(0.42f)
                 .Flicker(flicker)
                 .Speed(22f)
+                .Envelope(0f, flashHold, fade, pause)
                 .Color(new Color(0.72f, 0.18f, 1f, 1f));
 
             fx.Beam("HotCore")
@@ -36,6 +40,7 @@ namespace Veyra.Examples
                 .Branches(0)
                 .Flicker(flicker)
                 .Speed(28f)
+                .Envelope(0f, flashHold * 0.8f, fade * 0.72f, pause)
                 .Color(new Color(0.9f, 0.8f, 1f, 1f));
 
             fx.Beam("Halo")
@@ -47,6 +52,7 @@ namespace Veyra.Examples
                 .BranchLength(0.3f)
                 .Flicker(flicker * 1.25f)
                 .Speed(16f)
+                .Envelope(0f, flashHold * 1.2f, fade * 1.15f, pause)
                 .Color(new Color(0.38f, 0.05f, 0.85f, 0.7f));
 
             return fx;
