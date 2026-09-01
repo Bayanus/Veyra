@@ -15,7 +15,7 @@ namespace Veyra.Examples
         {
             var fx = VeyraProgram.Create("Succulent Lightning");
             var start = Vector3.zero;
-            var end = Vector3.forward * length;
+            var end = Vector3.right * length;
 
             fx.Beam("Core")
                 .From(start).To(end)
@@ -26,7 +26,7 @@ namespace Veyra.Examples
                 .BranchLength(0.42f)
                 .Flicker(flicker)
                 .Speed(22f)
-                .Color(new Color(0.65f, 0.85f, 1f, 1f));
+                .Color(new Color(0.72f, 0.18f, 1f, 1f));
 
             fx.Beam("HotCore")
                 .From(start).To(end)
@@ -36,7 +36,7 @@ namespace Veyra.Examples
                 .Branches(0)
                 .Flicker(flicker)
                 .Speed(28f)
-                .Color(Color.white);
+                .Color(new Color(0.9f, 0.8f, 1f, 1f));
 
             fx.Beam("Halo")
                 .From(start).To(end)
@@ -47,7 +47,7 @@ namespace Veyra.Examples
                 .BranchLength(0.3f)
                 .Flicker(flicker * 1.25f)
                 .Speed(16f)
-                .Color(new Color(0.25f, 0.55f, 1f, 0.7f));
+                .Color(new Color(0.38f, 0.05f, 0.85f, 0.7f));
 
             return fx;
         }
